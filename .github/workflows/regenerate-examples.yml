@@ -1,0 +1,73 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Regenerate Examples
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the main branch
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout this repo
+        uses: actions/checkout@v2
+        with:
+          path: storybook-examples
+
+      - name: Checkout @storybook/storybook
+        uses: actions/checkout@v2
+        with:
+          repository: storybookjs/storybook
+          path: storybook
+          ref: tech/extract-examples
+
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14
+
+      - name: Cache node modules
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: | 
+            storybook/node_modules
+            /home/runner/.cache/Cypress
+          key: ${{ runner.os }}-node-${{ hashFiles('storybook/yarn.lock') }}-v2
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd $GITHUB_WORKSPACE/storybook
+          yarn install
+        env:
+          HUSKY_SKIP_INSTALL: true
+
+      - name: Generate SB web_components example
+        run: |
+          cd $GITHUB_WORKSPACE/storybook
+          yarn test:e2e-framework web_components@latest  
+
+      - name: Display Git Diff
+        run: |
+          rm -rf $GITHUB_WORKSPACE/storybook-examples/web_components-latest
+          mv $GITHUB_WORKSPACE/storybook-e2e-testing/web_components-latest $GITHUB_WORKSPACE/storybook-examples/web_components-latest
+          cd $GITHUB_WORKSPACE/storybook-examples
+          git add web_components-latest
+          ls 
+          git status
+          git diff > myfile
+          cat myfile
